@@ -1,0 +1,142 @@
+<template>
+    <lightning-card>
+        <div style="text-align: center;margin-bottom: 20px;font-size:30px;color:blue">
+            <h1 class="title"><b>GatorPAS DataLoader</b></h1>
+        </div>
+
+        <lightning-combobox
+            name="Header Objects"
+            label="Header Objects"
+            value={value}
+            onchange={handleChange}
+            options={recordOptions}
+            placeholder="Select an Object"
+            style="margin: 40px;">
+        </lightning-combobox>
+
+        <div style="margin: 40px;">
+            <template if:true={userHasDataLoaderPermission}>
+                <template if:true={showAccountFileUpload}>
+                    <template if:true={userHasAccCreationPermission}>
+                        <div class="slds-grid slds-grid_vertical-align-center slds-grid_align-center" style="height:100px">
+                            <div class="slds-col">
+                                <p><b>Upload CSV File For Account Creation</b></p>
+                                <lightning-input
+                                    type="file"
+                                    accept={acceptedFormats}
+                                    onchange={handleAccUploadFile}
+                                    disabled={isButtonDisabled}
+                                    class="slds-p-bottom_medium">
+                                </lightning-input>
+                                <p if:true={fileName}>{fileName} Uploaded Successfully</p>
+                            </div>
+                            <div class="slds-col slds-p-top_medium">
+                                <lightning-button
+                                    variant="brand"
+                                    label="Insert"
+                                    title="Primary action"
+                                    onclick={handleAccInsertClick}
+                                    disabled={checkSubmit}
+                                    class="slds-m-left_x-small">
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Cancel"
+                                    title="Primary action"
+                                    onclick={handleCancelClick}
+                                    disabled={showCancelButton}
+                                    class="slds-m-left_x-small">
+                                </lightning-button>
+                                <lightning-button
+                                    variant="brand"
+                                    label="Preview"
+                                    title="Primary action"
+                                    onclick={handlePreviewClick}
+                                    disabled={showPreviewButton}
+                                    class="slds-m-left_x-small">
+                                </lightning-button>
+                            </div>
+                        </div>
+
+                        <template if:true={showModal}>
+                            <section role="dialog" tabindex="-1" aria-modal="true" aria-labelledby="modal-heading-01" class="slds-modal slds-fade-in-open">
+                                <div class="slds-modal__container">
+                                    <header class="slds-modal__header">
+                                        <lightning-button-Icon
+                                            variant="bare-inverse"
+                                            icon-name="utility:close"
+                                            alternative-text="close"
+                                            onclick={handleCloseModal}
+                                            class="slds-modal__close"
+                                            size="small">
+                                        </lightning-button-Icon>
+                                        <h2 id="modal-heading-01" class="slds-text-heading_medium slds-hyphenate">Preview Records</h2>
+                                    </header>
+
+                                    <div class="slds-modal__content slds-p-around_medium" id="modal-content-id-1">
+                                        <template if:true={showPreview}>
+                                            <div style="height: 300px;">
+                                                <lightning-datatable
+                                                    key-field="Id"
+                                                    data={data}
+                                                    columns={columns}
+                                                    show-row-number-column
+                                                    hide-checkbox-column>
+                                                </lightning-datatable>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </section>
+                            <div class="slds-backdrop slds-backdrop_open" role="presentation"></div>
+                        </template>
+                    </template>
+
+                    <template if:false={userHasAccCreationPermission}>
+                        <b>User Doesn't Have the Account Creation Permissions</b>
+                    </template>
+                </template>
+
+                <template if:true={showContactFileUpload}>
+                    <template if:true={userHasConCreationPermission}>
+                        <div>
+                            <p><b>Upload CSV File For Contact Creation</b></p>
+                            <lightning-input
+                                type="file"
+                                accept={acceptedFormats}
+                                onchange={handleConUploadFile}>
+                            </lightning-input>
+                        </div>
+                    </template>
+
+                    <template if:false={userHasConCreationPermission}>
+                        <b>User Doesn't Have the Contact Creation Permissions</b>
+                    </template>
+                </template>
+
+                <template if:true={showOpportunityFileUpload}>
+                    <template if:true={userHasOppCreationPermission}>
+                        <div>
+                            <p><b>Upload CSV File For Opportunity Creation</b></p>
+                            <lightning-input
+                                type="file"
+                                accept={acceptedFormats}
+                                onchange={handleOppUploadFile}>
+                            </lightning-input>
+                        </div>
+                    </template>
+
+                    <template if:false={userHasOppCreationPermission}>
+                        <b>User Doesn't Have the Opportunity Creation Permissions</b>
+                    </template>
+                </template>
+
+            </template>
+        </div>
+
+        <template if:false={userHasDataLoaderPermission}>
+            <b>User Doesn't Have the Data Loader Permissions</b>
+        </template>
+    </lightning-card>
+</template>
+

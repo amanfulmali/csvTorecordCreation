@@ -1,0 +1,142 @@
+global class CSVParser {  
+    
+    @AuraEnabled(Cacheable=True)
+    public static List<Header__c> getHeaders(){
+        List<Header__c> headerList=[select Id,Name from Header__c];
+        return headerList;
+    }
+    @AuraEnabled
+    public static String saveCsvFile1(String data) {
+        String result = '';
+        wrappCSV csvData;
+        List<Account> accountListToInsert = new List<Account>();
+        csvData = (wrappCSV) JSON.deserialize(data, wrappCSV.class);
+        if (csvData != null) {
+            String fileName = (csvData.fileName != null && csvData.fileName != '') ? csvData.fileName : null;
+            String fileBody = (csvData.fileBody != null && csvData.fileBody != '') ? csvData.fileBody : null;
+            String headerId = (csvData.headerId != null && csvData.headerId != '') ? csvData.headerId : null;
+            
+            if (headerId != null && fileBody != null && fileName != null) {
+                List<Mapping__c> childMappingList = [SELECT Id, Key__c, Value__c, Header__c, Header__r.Name, Sequence__c
+                                                     FROM Mapping__c
+                                                     WHERE Header__c = :headerId
+                                                     ORDER BY Sequence__c ASC];
+                
+                Map<Decimal, Mapping__c> templateMap = new Map<Decimal, Mapping__c>();
+                List<String> headerFieldName = new List<String>();
+                
+                if (!childMappingList.isEmpty()) {
+                    List<String> rows = fileBody.split('\n');
+                    if (!rows.isEmpty()) {
+                        headerFieldName = rows[0].split(',');
+                        rows.remove(0);
+                    }
+                    if (rows.size() < 1) {
+                        result = 'No Records To Insert';
+                        return result;
+                    }
+                    for (Mapping__c mappingRecord : childMappingList) {
+                        templateMap.put(mappingRecord.Sequence__c, mappingRecord);
+                    }
+                    
+                    if (headerFieldName.size() != templateMap.keySet().size()) {
+                        result = 'Header Columns length and Account Template Fields Length Not Matched';
+                        return result;
+                    }
+                    
+                    Integer fieldSize = templateMap.keySet().size();
+                    for (Integer i = 0; i < fieldSize; i++) {
+                        if (headerFieldName[i].trim() != templateMap.get(i).Value__c) {
+                            result = 'The Sequence in the Child Mapping Not Followed in CSV File';
+                            return result;
+                        }
+                    }
+                    
+                    Integer rowNo = 1;
+                    string objType='Account';
+                    Map<String, Schema.DisplayType> fieldDataTypes = getFieldDataTypes(objType); // Get field data types
+                    system.debug(fieldDataTypes);
+                    for (String row : rows) {
+                        rowNo++;
+                        List<String> fields = row.split(',');
+                        Account account = new Account();
+                        
+                        for (Integer i = 0; i < fieldSize; i++) {
+                            String fieldName = templateMap.get(i).Key__c;
+                            String fieldValue = fields[i].trim();
+                            system.debug('fieldName ::'+fieldName);
+                            system.debug('datatype ::'+fieldDataTypes.get(fieldName.toLowerCase()));
+                            Schema.DisplayType fieldDataType =fieldDataTypes.containsKey(fieldName.toLowerCase())? fieldDataTypes.get(fieldName.toLowerCase()):Null;
+                            if (fieldDataType == Schema.DisplayType.CURRENCY && fieldValue != Null && fieldValue != '') { 
+                                try {
+                                    account.put(fieldName, convertToDecimal(fieldValue)); 
+                                } catch (Exception exe) {
+                                    result = 'Row Index : ' + rowNo + ' - ' + exe.getMessage().substringAfter(',').substringBeforeLast(':');
+                                    return result;
+                                }
+                            } else if (fieldDataType == Schema.DisplayType.Date && fieldValue != Null && fieldValue != '') { 
+                                try {
+                                    account.put(fieldName, convertToDate(fieldValue)); 
+                                } catch (Exception exe) {
+                                    result = 'Row Index : ' + rowNo + ' - ' + exe.getMessage().substringAfter(',').substringBeforeLast(':');
+                                    return result;
+                                }
+                            } else {
+                                account.put(fieldName, fieldValue);
+                            }
+                        }
+                        accountListToInsert.add(account);
+                    }
+                    if (!accountListToInsert.isEmpty()) {
+                        try {
+                            insert accountListToInsert;
+                            result = 'Records Created Successfully';
+                        } catch (Exception exe) {
+                            result = exe.getMessage().substringAfter(',').substringBeforeLast(':');
+                            return result;
+                        }
+                    }
+                } else {
+                    result = 'No Mappings Found';
+                    return result;
+                }
+            }
+        } else {
+            result = 'No Data in CSV';
+            return result;
+        }
+        return result;
+    }
+    
+    private static Decimal convertToDecimal(String value) {
+        return Decimal.valueOf(value);
+    }
+    private static Date convertToDate(String value) {
+        List<String> dateParts = value.split('/');
+        String month = dateParts[0];
+        String day = dateParts[1];
+        String year = dateParts[2];
+        return Date.newInstance(Integer.valueOf(year), Integer.valueOf(month), Integer.valueOf(day));
+    }
+    
+    private static Map<String, Schema.DisplayType> getFieldDataTypes(String objType) {
+        // String objType='Account';
+        Map<String, Schema.SObjectType> schemaMap = Schema.getGlobalDescribe();
+        Schema.SObjectType objSchema = schemaMap.get(objType);
+        Map<String, Schema.DisplayType> fieldDataTypes = new Map<String, Schema.DisplayType>();
+        Map<String, Schema.SObjectField> fields = objSchema.getDescribe().fields.getMap();
+        for (String fieldName : fields.keySet()) {
+            Schema.SObjectField field = fields.get(fieldName);
+            Schema.DescribeFieldResult fieldDescribe = field.getDescribe();
+            Schema.DisplayType fieldType = fieldDescribe.getType();
+            fieldDataTypes.put(fieldName, fieldType);
+        }
+        
+        return fieldDataTypes;
+    }
+    class wrappCSV{
+        string fileName;
+        string fileBody;
+        string headerId;
+    }
+}
